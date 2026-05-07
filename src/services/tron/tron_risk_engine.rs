@@ -1,4 +1,4 @@
-use crate::utils::tron_classifier::types::ContractType;
+use crate::services::tron::tron_classifier::types::ContractType;
 
 pub fn compute_risk_score(
     classification: &ContractType,

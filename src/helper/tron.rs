@@ -25,7 +25,7 @@ impl TronClient {
         })
     }
 
-    async fn post(&self, endpoint: &str, body: Value) -> Result<Value> {
+    pub async fn post(&self, endpoint: &str, body: Value) -> Result<Value> {
         let url = format!("{}/{}", self.base_url, endpoint);
 
         let mut request = self.client.post(&url).json(&body);

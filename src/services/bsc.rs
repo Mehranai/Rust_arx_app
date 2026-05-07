@@ -4,7 +4,7 @@ use anyhow::Result;
 use ethers::prelude::*;
 use futures::stream::{FuturesUnordered, StreamExt};
 
-use crate::models::transcation::public::Sensivity;
+use crate::models::transaction::Sensivity;
 use crate::services::loader::LoaderBsc;
 use crate::progress::progress::{
     save_sync_state,

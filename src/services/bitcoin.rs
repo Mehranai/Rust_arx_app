@@ -1,5 +1,5 @@
 use crate::services::loader::LoaderBtc;
-use crate::models::transcation::public::Sensivity;
+use crate::models::transaction::Sensivity;
 use crate::progress::progress::{save_tx, save_wallet};
 use crate::models::blockstreams::*;
 

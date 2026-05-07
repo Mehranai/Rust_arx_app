@@ -1,10 +1,8 @@
 pub mod bitcoin;
-pub mod ethereum;
 pub mod bsc;
 pub mod tron;
-
+pub mod ethereum;
 // helper section
 pub mod loader;
-pub mod ethereum_detail;
-pub mod token_metadata_worker;
 pub mod sync_logic;
+pub mod token_metadata_worker;

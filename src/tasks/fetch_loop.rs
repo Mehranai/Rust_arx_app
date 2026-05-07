@@ -7,9 +7,9 @@ use crate::config::AppConfig;
 use crate::services::{
     loader::{LoaderEth, LoaderBtc, LoaderBsc, LoaderTron},
     bitcoin,
-    ethereum,
     bsc,
     tron,
+    ethereum,
     sync_logic::{resolve_start_block_btc, resolve_start_block_evm, resolve_start_block_tron},
 };
 
@@ -99,7 +99,7 @@ pub async fn run_eth_loop(config: AppConfig) -> Result<()> {
     );
 
     // شروع fetch
-    ethereum::fetch_eth(
+    ethereum::fetcher::fetch_eth(
         loader.clone(),
         start_block,
         config.total_eth_txs,
@@ -188,7 +188,7 @@ pub async fn run_tron_loop(config: AppConfig) -> Result<()> {
         config.sync_mode, start_block, last_synced
     );
 
-    tron::fetch_tron(
+    tron::fetcher::fetch_tron(
         loader.clone(),
         start_block,
         config.total_tron_txs,

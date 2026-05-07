@@ -1,5 +1,5 @@
 use super::types::ContractType;
-use crate::utils::tron_classification::SimpleTransfer;
+use crate::services::tron::tron_classification::SimpleTransfer;
 
 pub fn analyze_flows(transfers: &[SimpleTransfer]) -> Option<ContractType> {
 

@@ -3,7 +3,7 @@ use super::registry::known_contracts;
 use super::method_decoder::detect_method;
 use super::flow_analyzer::analyze_flows;
 
-use crate::utils::tron_classification::SimpleTransfer;
+use crate::services::tron::tron_classification::SimpleTransfer;
 
 pub fn classify(
     input: &ClassificationInput,

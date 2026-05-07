@@ -1,21 +1,15 @@
 use clickhouse::Row;
 use serde::Serialize;
 
-#[derive(Debug, Row, Serialize)]
-pub struct TronTransactionRow {
+#[derive(Debug, clickhouse::Row, serde::Serialize)]
+pub struct TransactionRow {
     pub hash: String,
     pub block_number: u64,
-    pub timestamp: u64,
-    pub contract_index: u32,
-    pub owner_addr: String,
+    pub from_addr: String,
     pub to_addr: String,
     pub value: String,
-    pub sensivity: u8,
     pub contract_type: String,
-    pub classification: Option<String>,
-    pub energy_used: u64,
-    pub net_used: u64,
-    pub fee: String,
+    pub sensivity: u8,
 }
 
 // models/tron_token_transfer.rs
