@@ -5,12 +5,11 @@ use anyhow::{anyhow, Result};
 use futures::stream::{FuturesUnordered, StreamExt};
 use serde_json::Value;
 
-use crate::models::token_transfer::TokenTransferRow;
+use crate::models::tron::modules::TronTokenTransferRow;
 use crate::models::tron::modules::TransactionRiskRow;
 
 use crate::progress::progress::{
     save_sync_state,
-    save_token_transfer,
     save_wallet,
 };
 
@@ -18,6 +17,7 @@ use crate::progress::progress_tron::{
     save_contract_metadata,
     save_transaction_features,
     save_transaction_risk,
+    save_token_transfer,
     save_tx,
     ContractMetadataRow,
     TransactionFeatureRow,
@@ -275,7 +275,7 @@ async fn process_tx(
     {
         save_token_transfer(
             loader.clickhouse.clone(),
-            TokenTransferRow {
+            TronTokenTransferRow {
                 tx_hash: txid.clone(),
                 block_number,
                 log_index,
@@ -283,6 +283,7 @@ async fn process_tx(
                 from_addr: from_addr.clone(),
                 to_addr: to_addr.clone(),
                 amount: amount.to_string(),
+                event_signature: ERC20_TRANSFER_TOPIC.to_string(),
             },
         )
             .await?;

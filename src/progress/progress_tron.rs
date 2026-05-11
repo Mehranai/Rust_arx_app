@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use clickhouse::Client;
-use crate::models::tron::modules::TransactionRow;
+
+use crate::models::tron::modules::{TransactionRow, TronTokenTransferRow};
 use crate::models::tron::modules::TransactionRiskRow;
 
 pub async fn save_tx(
@@ -122,6 +123,20 @@ pub async fn save_transaction_risk(
     let mut insert = clickhouse
         .insert::<TransactionRiskRow>("transaction_risk")
         .await?;
+
+    insert.write(&row).await?;
+    insert.end().await?;
+
+    Ok(())
+}
+
+pub async fn save_token_transfer(
+    clickhouse: Arc<Client>,
+    row: TronTokenTransferRow,
+) -> anyhow::Result<()> {
+
+    let mut insert =
+        clickhouse.insert::<TronTokenTransferRow>("token_transfers").await?;
 
     insert.write(&row).await?;
     insert.end().await?;
