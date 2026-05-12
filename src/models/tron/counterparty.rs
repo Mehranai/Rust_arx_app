@@ -1,0 +1,22 @@
+use clickhouse::Row;
+
+use serde::{
+    Serialize,
+    Deserialize,
+};
+
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Row
+)]
+pub struct CounterpartyRow {
+    pub address:String,
+    pub counterparty:String,
+    pub total_txs:u64,
+    pub total_volume:String,
+    pub first_seen:u64,
+    pub last_seen:u64,
+}

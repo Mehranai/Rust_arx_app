@@ -49,61 +49,13 @@ pub struct AppConfig {
     // rate limit
     pub rpc_timeout_seconds: u64,
     pub rpc_max_concurrency: usize,
+
+    pub neo4j_uri: String,
+    pub neo4j_username: String,
+    pub neo4j_password: String,
+
 }
 
-// impl AppConfig {
-//     pub fn from_env() -> Self {
-//         let mode = match env::var("APP_MODE").as_deref() {
-//             Ok("eth") => AppMode::Eth,
-//             Ok("btc") => AppMode::Btc,
-//             Ok("bsc") => AppMode::Bsc,
-//             _ => panic!("APP_MODE must be one of these:\neth, bsc or btc"),
-//         };
-
-//         let sync_mode = match env::var("SYNC_MODE").as_deref() {
-//             Ok("backfill") => SyncMode::Backfill,
-//             Ok("live") => SyncMode::Live,
-//             _ => SyncMode::Auto,
-//         };
-
-        
-
-//         Self {
-//             mode,
-//             sync_mode,
-//             clickhouse_url: env::var("CLICKHOUSE_URL").expect("Clickhouse URL Faild"),
-//             clickhouse_user: env::var("CLICKHOUSE_USER").expect("Clickhouse Username Faild"),
-//             clickhouse_pass: env::var("CLICKHOUSE_PASSWORD").expect("Clickhouse Password Faild"),
-
-//             clickhouse_db_eth: env::var("CLICKHOUSE_DB_ETH").expect("Clickhouse DB ETH Faild").into(),
-//             clickhouse_db_btc: env::var("CLICKHOUSE_DB_BTC").expect("Clickhouse DB BTC Faild").into(),
-//             clickhouse_db_bsc: env::var("CLICKHOUSE_DB_BSC").expect("Clickhouse DB BSC Faild").into(),
-
-//             eth_rpc_url: env::var("ETH_RPC_HTTP").ok(),
-//             btc_api_url: env::var("BTC_API_URL").ok(),
-//             bsc_rpc_url: env::var("BSC_RPC_HTTP").ok(),
-
-//             btc_start_block: env::var("BTC_START_BLOCK").expect("Clickhouse BTC start block Faild").parse().expect("Cannot Parse String to int"),
-//             eth_start_block: env::var("ETH_START_BLOCK").expect("Clickhouse ETH Start block Faild").parse().expect("Cannot Parse U64"),
-//             bsc_start_block: env::var("BSC_START_BLOCK").expect("Clickhouse BSC Start block Faild").parse().expect("Cannot Parse U64"),
-//             total_btc_txs: env::var("TOTAL_BTC_TXS").expect("Clickhouse totla btc Faild").parse().expect("cannot pase int"),
-//             total_eth_txs: env::var("TOTAL_ETH_TXS").expect("Clickhouse total eth Faild").parse().expect("Cannot parse intss"),
-//             total_bsc_txs: env::var("TOTAL_BSC_TXS").expect("Clickhouse total bsc Faild").parse().expect("Cannot parse intss"),
-
-//             rpc_timeout_seconds: env::var("RPC_TIMEOUT_SECONDS")
-//             .unwrap_or("120".into())
-//             .parse()
-//             .expect("Cannot parse RPC_TIMEOUT_SECONDS"),
-
-//             rpc_max_concurrency: env::var("RPC_MAX_CONCURRENCY")
-//                 .unwrap_or("10".into())
-//                 .parse()
-//                 .expect("Cannot parse RPC_MAX_CONCURRENCY"),
-//         }
-//     }
-// }
-
-// Test
 impl AppConfig {
     pub fn from_env() -> Self {
         let mode = AppMode::Tron;
@@ -139,6 +91,10 @@ impl AppConfig {
 
             rpc_timeout_seconds: 120,
             rpc_max_concurrency: 10,
+
+            neo4j_uri: "bolt://localhost:7687".into(),
+            neo4j_username: "neo4j".into(),
+            neo4j_password: "password".into(),
         }
     }
 }

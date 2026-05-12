@@ -4,6 +4,18 @@ use clickhouse::Client;
 use crate::models::tron::modules::{TransactionRow, TronTokenTransferRow};
 use crate::models::tron::modules::TransactionRiskRow;
 
+use crate::models::tron::relationship::AddressRelationshipRow;
+
+use crate::models::tron::exchange::{
+    ExchangeAddressRow,
+    ExchangeFlowRow,
+};
+
+use crate::models::tron::exposure::{
+    ExposureSeedRow,
+    AddressExposureRow,
+};
+
 pub async fn save_tx(
     clickhouse: Arc<Client>,
     hash: String,
@@ -137,6 +149,104 @@ pub async fn save_token_transfer(
 
     let mut insert =
         clickhouse.insert::<TronTokenTransferRow>("token_transfers").await?;
+
+    insert.write(&row).await?;
+    insert.end().await?;
+
+    Ok(())
+}
+
+pub async fn save_relationships(
+    clickhouse: Arc<Client>,
+    rows: Vec<AddressRelationshipRow>,
+)
+    -> anyhow::Result<()>
+{
+    if rows.is_empty() {
+        return Ok(());
+    }
+
+    let mut insert = clickhouse
+        .insert::<AddressRelationshipRow>(
+            "address_relationships"
+        )
+        .await?;
+
+    for row in rows {
+        insert.write(&row).await?;
+    }
+
+    insert.end().await?;
+
+    Ok(())
+}
+
+pub async fn save_exchange_address(
+    clickhouse: Arc<Client>,
+    row: ExchangeAddressRow,
+)
+    -> anyhow::Result<()>
+{
+
+    let mut insert = clickhouse
+        .insert::<ExchangeAddressRow>(
+            "exchange_addresses"
+        )
+        .await?;
+
+    insert.write(&row).await?;
+    insert.end().await?;
+
+    Ok(())
+}
+
+pub async fn save_exchange_flow(
+    clickhouse: Arc<Client>,
+    row: ExchangeFlowRow,
+)
+    -> anyhow::Result<()>
+{
+
+    let mut insert = clickhouse
+        .insert::<ExchangeFlowRow>(
+            "exchange_flows"
+        )
+        .await?;
+
+    insert.write(&row).await?;
+    insert.end().await?;
+
+    Ok(())
+}
+
+pub async fn save_exposure_seed(
+    clickhouse: Arc<Client>,
+    row: ExposureSeedRow,
+)
+    -> anyhow::Result<()>
+{
+    let mut insert = clickhouse
+        .insert::<ExposureSeedRow>(
+            "exposure_seeds"
+        )
+        .await?;
+    insert.write(&row).await?;
+    insert.end().await?;
+
+    Ok(())
+}
+
+pub async fn save_address_exposure(
+    clickhouse: Arc<Client>,
+    row: AddressExposureRow,
+)
+    -> anyhow::Result<()>
+{
+    let mut insert = clickhouse
+        .insert::<AddressExposureRow>(
+            "address_exposure"
+        )
+        .await?;
 
     insert.write(&row).await?;
     insert.end().await?;

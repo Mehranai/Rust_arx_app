@@ -1,19 +1,49 @@
-use super::types::ContractType;
-use crate::services::tron::tron_classification::SimpleTransfer;
+use crate::services::tron::aml::flow_engine::compute_net_flows;
 
-pub fn analyze_flows(transfers: &[SimpleTransfer]) -> Option<ContractType> {
+use crate::services::tron::aml::types::SimpleTransfer;
 
-    let mut sent_tokens = std::collections::HashSet::new();
-    let mut received_tokens = std::collections::HashSet::new();
+use super::types::{
+    ContractCategory,
+    ProtocolInfo,
+};
 
-    for t in transfers {
-        sent_tokens.insert(t.token.clone());
-        received_tokens.insert(t.token.clone());
-    }
+pub fn analyze_flows(
+    transfers: &[SimpleTransfer],
+) -> Option<ProtocolInfo> {
 
-    // swap pattern
-    if sent_tokens.len() > 0 && received_tokens.len() > 1 {
-        return Some(ContractType::Dex);
+    let flows =
+        compute_net_flows(transfers);
+
+    for (_address, token_map) in flows {
+
+        let mut negative = 0;
+        let mut positive = 0;
+
+        for (_token, delta) in token_map {
+
+            if delta < 0 {
+                negative += 1;
+            }
+
+            if delta > 0 {
+                positive += 1;
+            }
+        }
+
+        //
+        // probable swap
+        //
+        if negative >= 1
+            && positive >= 1
+        {
+            return Some(
+                ProtocolInfo {
+                    protocol: "FlowBasedDex",
+                    category: ContractCategory::Dex,
+                    confidence: 0.60,
+                }
+            );
+        }
     }
 
     None

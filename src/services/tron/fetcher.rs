@@ -24,23 +24,44 @@ use crate::progress::progress_tron::{
 };
 
 use crate::services::loader::LoaderTron;
-
 use crate::utils::tron_address::normalize_tron_address;
 
-use crate::services::tron::tron_classification::{
-    detect_bridges,
-    detect_swaps,
-    SimpleTransfer,
-};
+// aml section
+use crate::services::tron::aml::types::SimpleTransfer;
+use crate::services::tron::aml::swap_detector::detect_swaps;
+use crate::services::tron::aml::bridge_detector::detect_bridges;
 
 use crate::services::tron::tron_classifier::classifier::classify;
 use crate::services::tron::tron_classifier::types::{
     ClassificationInput,
-    ContractType,
+    ContractCategory,
 };
 
 use crate::services::tron::tron_metadata_worker;
-use crate::services::tron::tron_risk_engine::compute_risk_score;
+use crate::services::tron::risk_engine::compute_risk_score;
+
+use crate::services::tron::relationship_builder::build_relationships;
+use crate::progress::progress_tron::save_relationships;
+use crate::services::tron::aml::mint_burn_detector::detect_mints_and_burns;
+
+// flow detection
+use crate::services::tron::exchange::detector::detect_exchange;
+use crate::services::tron::exchange::flow_builder::build_exchange_flows;
+use crate::models::tron::exchange::ExchangeAddressRow;
+
+use crate::progress::progress_tron::{
+    save_exchange_address,
+    save_exchange_flow,
+};
+
+// intelligence system
+use crate::services::tron::address_intelligence::{
+    build_address_profiles,
+};
+use crate::models::tron::address_profile::AddressProfileRow;
+use crate::progress::address_profile::{
+    save_address_profiles,
+};
 
 const ZERO_ADDRESS: &str =
     "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb";
@@ -235,6 +256,28 @@ async fn process_tx(
         value = v;
     }
 
+    let mut simple_transfers =
+        Vec::<SimpleTransfer>::new();
+
+    if !from.is_empty()
+        && !to.is_empty()
+        && value > 0
+    {
+        simple_transfers.push(
+            SimpleTransfer {
+
+                token:
+                "TRX".to_string(),
+
+                from: from.clone(),
+
+                to: to.clone(),
+
+                amount: value as u128,
+            }
+        );
+    }
+
     save_tx(
         loader.clickhouse.clone(),
         txid.clone(),
@@ -340,10 +383,10 @@ async fn process_tx(
         &simple_transfers,
     );
 
-    let is_contract_call = match classification {
-        ContractType::Dex
-        | ContractType::Bridge
-        | ContractType::Lending => 1,
+    let is_contract_call = match classification.category {
+        ContractCategory::Dex
+        | ContractCategory::Bridge
+        | ContractCategory::Lending => 1,
 
         _ => {
             if contract_type
@@ -364,7 +407,7 @@ async fn process_tx(
             contract_address.clone(),
 
             contract_type:
-            classification.to_string(),
+            classification.category.to_string(),
 
             creator_address: from.clone(),
 
@@ -383,6 +426,10 @@ async fn process_tx(
 
         let swaps =
             detect_swaps(
+                &simple_transfers
+            );
+        let mint_burns =
+            detect_mints_and_burns(
                 &simple_transfers
             );
 
@@ -427,6 +474,12 @@ async fn process_tx(
                 participants,
             };
 
+
+        let mut aml_events = Vec::new();
+        aml_events.extend(swaps.clone());
+        aml_events.extend(bridges.clone());
+        aml_events.extend(mint_burns.clone());
+
         save_transaction_features(
             loader.clickhouse.clone(),
             feature,
@@ -470,6 +523,71 @@ async fn process_tx(
             risk_row,
         )
             .await?;
+
+        let relationships =
+            build_relationships(
+                &txid,
+                block_number,
+                tx["raw_data"]["timestamp"]
+                    .as_u64()
+                    .unwrap_or(0),
+
+                &simple_transfers,
+                &aml_events,
+                &classification.protocol,
+                risk_score,
+            );
+        save_relationships(
+            loader.clickhouse.clone(),
+            relationships,
+        ).await?;
+
+        // historical address intelligence
+
+        let profiles =
+            build_address_profiles(
+                &simple_transfers
+            );
+        let mut profile_rows =
+            Vec::<AddressProfileRow>::new();
+
+        for (_, profile) in profiles {
+
+            profile_rows.push(
+                AddressProfileRow {
+                    address: profile.address,
+                    total_in_tx: profile.total_in_tx,
+                    total_out_tx: profile.total_out_tx,
+                    unique_senders: profile.unique_senders,
+                    unique_receivers: profile.unique_receivers,
+                    total_volume_in: profile.total_volume_in.to_string(),
+                    total_volume_out: profile.total_volume_out.to_string(),
+                    interacted_tokens: profile.interacted_tokens.len() as u32,
+                    probable_exchange: profile.probable_exchange as u8,
+                    probable_deposit_wallet: profile.probable_deposit_wallet as u8,
+                    probable_sweeper: profile.probable_sweeper as u8,
+                    risk_score: profile.risk_score,
+                }
+            );
+        }
+        save_address_profiles(
+            loader.clickhouse.clone(),
+            profile_rows,
+        ).await?;
+
+        let exchange_flows =
+            build_exchange_flows(
+                &txid,
+                block_number,
+                &simple_transfers,
+            );
+
+        for flow in exchange_flows {
+            save_exchange_flow(
+                loader.clickhouse.clone(),
+                flow,
+            ).await?;
+        }
     }
 
     // save all wallets
@@ -490,6 +608,36 @@ async fn process_tx(
     }
 
     for addr in wallets {
+        if let Some(exchange) =
+            detect_exchange(&addr)
+        {
+            save_exchange_address(
+                loader.clickhouse.clone(),
+                ExchangeAddressRow {
+                    address:
+                    addr.clone(),
+
+                    exchange_name:
+                    exchange.exchange_name,
+
+                    address_role:
+                    exchange.address_role,
+
+                    confidence:
+                    exchange.confidence,
+
+                    detection_source:
+                    exchange.detection_source,
+
+                    first_seen_block:
+                    block_number,
+
+                    last_seen_block:
+                    block_number,
+                }
+            ).await?;
+        }
+
         save_wallet_tron(
             loader.clone(),
             addr,

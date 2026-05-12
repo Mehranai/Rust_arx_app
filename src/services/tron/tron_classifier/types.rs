@@ -1,32 +1,80 @@
-use serde::{Serialize, Deserialize};
+use serde::{
+    Serialize,
+    Deserialize,
+};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ContractType {
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
+pub enum ContractCategory {
+
     Dex,
     Bridge,
     Lending,
+    Staking,
+    Mixer,
     Token,
     Nft,
     Scam,
+    Wallet,
     Unknown,
 }
 
-impl ToString for ContractType {
+impl ToString for ContractCategory {
+
     fn to_string(&self) -> String {
+
         match self {
-            ContractType::Dex => "DEX",
-            ContractType::Bridge => "BRIDGE",
-            ContractType::Lending => "LENDING",
-            ContractType::Token => "TRC20",
-            ContractType::Nft => "NFT",
-            ContractType::Scam => "SCAM",
-            ContractType::Unknown => "UNKNOWN",
-        }.to_string()
+
+            Self::Dex => "DEX",
+            Self::Bridge => "BRIDGE",
+            Self::Lending => "LENDING",
+            Self::Staking => "STAKING",
+            Self::Mixer => "MIXER",
+            Self::Token => "TOKEN",
+            Self::Nft => "NFT",
+            Self::Scam => "SCAM",
+            Self::Wallet => "WALLET",
+            Self::Unknown => "UNKNOWN",
+        }
+            .to_string()
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct ClassificationInput {
+
     pub contract_address: String,
+
     pub method_data: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProtocolInfo {
+
+    pub protocol: &'static str,
+
+    pub category: ContractCategory,
+
+    pub confidence: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClassificationResult {
+
+    pub protocol: String,
+
+    pub category: ContractCategory,
+
+    pub confidence: f32,
+
+    pub detection_source: String,
+
+    pub method_id: Option<String>,
 }

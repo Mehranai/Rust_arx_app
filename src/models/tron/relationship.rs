@@ -1,0 +1,17 @@
+use clickhouse::Row;
+use serde::Serialize;
+
+#[derive(Debug, Clone, Row, Serialize)]
+pub struct AddressRelationshipRow {
+
+    pub from_address: String,
+    pub to_address: String,
+    pub token_address: String,
+    pub tx_hash: String,
+    pub block_number: u64,
+    pub timestamp: u64,
+    pub amount: String,
+    pub transfer_type: String,
+    pub protocol: String,
+    pub risk_score: u8,
+}
