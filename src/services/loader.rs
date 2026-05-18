@@ -6,6 +6,14 @@ use anyhow::Result;
 
 use crate::helper::tron::TronClient;
 
+//Batcher
+use crate::services::tron::batcher::transactions::TransactionBatcher;
+use crate::services::tron::batcher::token_transfers::TokenTransferBatcher;
+use crate::services::tron::batcher::relationships::RelationshipBatcher;
+
+// concurency
+use crate::config::AppConfig;
+
 pub struct LoaderEth {
     pub clickhouse: Arc<Client>,
     pub eth_provider: Arc<Provider<Http>>,
@@ -102,6 +110,10 @@ pub struct LoaderTron {
     pub clickhouse: Arc<Client>,
     pub tron_client: Arc<TronClient>,
     pub rpc_limiter: Arc<Semaphore>,
+    pub transaction_batcher: Arc<TransactionBatcher>,
+    pub token_transfer_batcher: Arc<TokenTransferBatcher>,
+    pub relationship_batcher: Arc<RelationshipBatcher>,
+    pub config: Arc<AppConfig>,
 }
 
 impl LoaderTron {
@@ -133,10 +145,29 @@ impl LoaderTron {
             Semaphore::new(config.rpc_max_concurrency)
         );
 
+        let transaction_batcher =
+            TransactionBatcher::new(
+                clickhouse.clone()
+            );
+
+        let token_transfer_batcher =
+            TokenTransferBatcher::new(
+                clickhouse.clone()
+        );
+
+        let relationship_batcher =
+            RelationshipBatcher::new(
+                clickhouse.clone()
+        );
+
         Ok(Self {
             clickhouse,
             tron_client,
             rpc_limiter,
+            transaction_batcher,
+            token_transfer_batcher,
+            relationship_batcher,
+            config: Arc::new(config.clone()),
         })
     }
 }

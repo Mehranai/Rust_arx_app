@@ -10,7 +10,7 @@ pub struct AddressRelationshipRow {
     pub tx_hash: String,
     pub block_number: u64,
     pub timestamp: u64,
-    pub amount: String,
+    pub amount: u128,
     pub transfer_type: String,
     pub protocol: String,
     pub risk_score: u8,

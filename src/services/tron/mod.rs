@@ -10,3 +10,4 @@ pub mod exposure;
 pub mod address_intelligence;
 pub mod counterparty;
 pub mod neo4j;
+pub mod batcher;

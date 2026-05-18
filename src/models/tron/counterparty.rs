@@ -18,7 +18,7 @@ pub struct CounterpartyRow {
     pub direction:String,
     pub token_address:String,
     pub total_txs:u64,
-    pub total_volume:String,
+    pub total_volume:u128,
     pub first_seen:u64,
     pub last_seen:u64,
 }

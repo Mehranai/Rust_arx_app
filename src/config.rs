@@ -48,6 +48,8 @@ pub struct AppConfig {
     pub rpc_timeout_seconds: u64,
     pub rpc_max_concurrency: usize,
 
+    pub tx_worker_concurrency: usize,
+
     pub neo4j_uri: String,
     pub neo4j_username: String,
     pub neo4j_password: String,
@@ -89,6 +91,8 @@ impl AppConfig {
 
             rpc_timeout_seconds: 120,
             rpc_max_concurrency: 10,
+
+            tx_worker_concurrency: 64,
 
             neo4j_uri: "bolt://localhost:7687".into(),
             neo4j_username: "neo4j".into(),

@@ -19,7 +19,7 @@ pub fn build_exchange_flows(
                 exchange_name: exchange.exchange_name,
                 flow_type: "deposit".to_string(),
                 token_address: transfer.token.clone(),
-                amount: transfer.amount.to_string(),
+                amount: transfer.amount,
                 confidence: exchange.confidence,
             });
         }
@@ -33,7 +33,7 @@ pub fn build_exchange_flows(
                 exchange_name: exchange.exchange_name,
                 flow_type: "withdrawal".to_string(),
                 token_address: transfer.token.clone(),
-                amount: transfer.amount.to_string(),
+                amount: transfer.amount,
                 confidence: exchange.confidence,
             });
         }

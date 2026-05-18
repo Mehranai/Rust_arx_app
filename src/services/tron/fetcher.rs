@@ -2,11 +2,13 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use futures::stream::{FuturesUnordered, StreamExt};
+use futures::stream::{self, StreamExt};
 use serde_json::Value;
 
 use crate::models::tron::modules::TronTokenTransferRow;
 use crate::models::tron::modules::TransactionRiskRow;
+use crate::models::tron::modules::TransactionRow;
+
 
 use crate::progress::progress::{
     save_sync_state,
@@ -17,8 +19,6 @@ use crate::progress::progress_tron::{
     save_contract_metadata,
     save_transaction_features,
     save_transaction_risk,
-    save_token_transfer,
-    save_tx,
     ContractMetadataRow,
     TransactionFeatureRow,
 };
@@ -286,16 +286,18 @@ async fn process_tx(
         );
     }
 
-    save_tx(
-        loader.clickhouse.clone(),
-        txid.clone(),
-        block_number,
-        from.clone(),
-        to.clone(),
-        value.to_string(),
-        contract_type.clone(),
-        calc_sensivity_tron(value),
-    ).await?;
+    loader.transaction_batcher
+        .push(
+            TransactionRow {
+                hash: txid.clone(),
+                block_number,
+                from_addr: from.clone(),
+                to_addr: to.clone(),
+                value: value as u128,
+                contract_type: contract_type.clone(),
+            }
+        )
+        .await?;
 
     let receipt = {
         let _permit =
@@ -321,19 +323,21 @@ async fn process_tx(
         amount,
     ) in transfers
     {
-        save_token_transfer(
-            loader.clickhouse.clone(),
-            TronTokenTransferRow {
-                tx_hash: txid.clone(),
-                block_number,
-                log_index,
-                token_address: token.clone(),
-                from_addr: from_addr.clone(),
-                to_addr: to_addr.clone(),
-                amount: amount.to_string(),
-                event_signature: ERC20_TRANSFER_TOPIC.to_string(),
-            },
-        )
+        loader
+            .token_transfer_batcher
+            .push(
+                TronTokenTransferRow {
+                    tx_hash: txid.clone(),
+                    block_number,
+                    log_index,
+                    token_address: token.clone(),
+                    from_addr: from_addr.clone(),
+                    to_addr: to_addr.clone(),
+                    amount,
+                    event_signature:
+                    ERC20_TRANSFER_TOPIC.to_string(),
+                }
+            )
             .await?;
 
         discovered_tokens.insert(token.clone());
@@ -542,13 +546,15 @@ async fn process_tx(
                 &classification.protocol,
                 risk_score,
             );
-        save_relationships(
-            loader.clickhouse.clone(),
-            relationships,
-        ).await?;
+
+        for row in relationships {
+            loader
+                .relationship_batcher
+                .push(row)
+                .await?;
+        }
 
         // historical address intelligence
-
         let profiles =
             build_address_profiles(
                 &simple_transfers
@@ -565,8 +571,8 @@ async fn process_tx(
                     total_out_tx: profile.total_out_tx,
                     unique_senders: profile.unique_senders,
                     unique_receivers: profile.unique_receivers,
-                    total_volume_in: profile.total_volume_in.to_string(),
-                    total_volume_out: profile.total_volume_out.to_string(),
+                    total_volume_in: profile.total_volume_in,
+                    total_volume_out: profile.total_volume_out,
                     interacted_tokens: profile.interacted_tokens.len() as u32,
                     probable_exchange: profile.probable_exchange as u8,
                     probable_deposit_wallet: profile.probable_deposit_wallet as u8,
@@ -593,7 +599,7 @@ async fn process_tx(
                         direction: relation.direction,
                         token_address: relation.token_address,
                         total_txs: relation.total_txs,
-                        total_volume: relation.total_volume.to_string(),
+                        total_volume: relation.total_volume,
                         first_seen: relation.first_seen,
                         last_seen: relation.last_seen,
                     }
@@ -779,49 +785,55 @@ pub async fn fetch_tron(
             continue;
         }
 
-        let mut tasks =
-            FuturesUnordered::new();
-
         let mut fully_processed = true;
 
-        for tx in txs {
+        let tx_vec = txs
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>();
 
-            if tx_count >= total_txs {
+        let remaining = total_txs.saturating_sub(tx_count);
 
-                fully_processed = false;
+        let tx_vec = tx_vec
+                .into_iter()
+                .take(remaining as usize)
+                .collect::<Vec<_>>();
 
-                break;
-            }
+        if tx_vec.len() < txs.len()
+        {
+            fully_processed = false;
+        }
 
-            let loader_clone =
-                loader.clone();
+        tx_count += tx_vec.len() as u64;
 
-            let tx_clone = tx.clone();
+        stream::iter(tx_vec)
+            .map(|tx| {
 
-            tasks.push(
-                tokio::spawn(async move {
+                let loader_clone =
+                    loader.clone();
+
+                async move {
                     process_tx(
                         loader_clone,
-                        tx_clone,
+                        tx,
                         current_block,
-                    )
-                        .await
-                }),
-            );
+                    ).await
+                }
+            })
 
-            tx_count += 1;
-
-            println!(
-                "[TRON] queued tx #{}",
-                tx_count
-            );
-        }
-
-        while let Some(res) =
-            tasks.next().await
-        {
-            res??;
-        }
+            .buffer_unordered(
+                loader
+                    .config
+                    .tx_worker_concurrency
+            )
+            .for_each(|res| async {
+                if let Err(err) = res {
+                    eprintln!(
+                        "[TRON TX ERROR] {:?}",
+                        err
+                    );
+                }
+            }).await;
 
         if fully_processed {
 

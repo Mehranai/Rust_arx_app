@@ -20,29 +20,52 @@ use crate::models::tron::exposure::{
 
 pub async fn save_tx(
     clickhouse: Arc<Client>,
-    hash: String,
+    tx_hash: String,
     block_number: u64,
-    from: String,
-    to: String,
-    value: String,
+    timestamp: u64,
+    from_address: String,
+    to_address: String,
+    contract_address: String,
+    amount: String,
     contract_type: String,
-    sensivity: u8,
+    fee: u128,
+    energy_fee: u128,
+    net_fee: u128,
+    energy_usage: u64,
+    energy_usage_total: u64,
+    net_usage: u64,
+    status: u8,
+    memo: String,
+    raw_data: String,
 ) -> anyhow::Result<()> {
 
     let tx_row = TransactionRow {
-        hash,
+        tx_hash,
         block_number,
-        from_addr: from,
-        to_addr: to,
-        value,
+        timestamp,
+        from_address,
+        to_address,
+        contract_address,
         contract_type,
+        amount: amount.parse::<u128>().unwrap_or(0),
+        fee,
+        energy_fee,
+        net_fee,
+        energy_usage,
+        energy_usage_total,
+        net_usage,
+        status,
+        memo,
+        raw_data,
     };
-    let _ = sensivity;
 
     let mut insert =
-        clickhouse.insert::<TransactionRow>("transactions").await?;
+        clickhouse
+            .insert::<TransactionRow>("transactions")
+            .await?;
 
     insert.write(&tx_row).await?;
+
     insert.end().await?;
 
     Ok(())
@@ -151,9 +174,14 @@ pub async fn save_token_transfer(
 ) -> anyhow::Result<()> {
 
     let mut insert =
-        clickhouse.insert::<TronTokenTransferRow>("token_transfers").await?;
+        clickhouse
+            .insert::<TronTokenTransferRow>(
+                "token_transfers"
+            )
+            .await?;
 
     insert.write(&row).await?;
+
     insert.end().await?;
 
     Ok(())

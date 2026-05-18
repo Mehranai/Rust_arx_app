@@ -36,7 +36,7 @@ pub async fn export_relationship(
 
         &row.token_address,
 
-        &row.amount,
+        &row.amount.to_string(),
 
         row.risk_score,
 

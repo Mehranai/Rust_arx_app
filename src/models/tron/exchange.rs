@@ -43,6 +43,6 @@ pub struct ExchangeFlowRow {
     pub exchange_name: String,
     pub flow_type: String,
     pub token_address: String,
-    pub amount: String,
+    pub amount: u128,
     pub confidence: f32,
 }
