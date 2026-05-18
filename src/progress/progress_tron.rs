@@ -7,7 +7,9 @@ use crate::models::tron::modules::TransactionRiskRow;
 use crate::models::tron::relationship::AddressRelationshipRow;
 
 use crate::models::tron::exchange::{
+    ExchangeClusterRow,
     ExchangeAddressRow,
+    ExchangeDepositAddressRow,
     ExchangeFlowRow,
 };
 
@@ -34,8 +36,8 @@ pub async fn save_tx(
         to_addr: to,
         value,
         contract_type,
-        sensivity,
     };
+    let _ = sensivity;
 
     let mut insert =
         clickhouse.insert::<TransactionRow>("transactions").await?;
@@ -89,6 +91,7 @@ pub struct ContractMetadataRow {
     pub contract_address: String,
     pub contract_type: String,
     pub creator_address: String,
+    #[serde(rename = "created_block")]
     pub created_at_block: u64,
 }
 
@@ -191,6 +194,42 @@ pub async fn save_exchange_address(
     let mut insert = clickhouse
         .insert::<ExchangeAddressRow>(
             "exchange_addresses"
+        )
+        .await?;
+
+    insert.write(&row).await?;
+    insert.end().await?;
+
+    Ok(())
+}
+
+pub async fn save_exchange_deposit_address(
+    clickhouse: Arc<Client>,
+    row: ExchangeDepositAddressRow,
+)
+    -> anyhow::Result<()>
+{
+    let mut insert = clickhouse
+        .insert::<ExchangeDepositAddressRow>(
+            "exchange_deposit_addresses"
+        )
+        .await?;
+
+    insert.write(&row).await?;
+    insert.end().await?;
+
+    Ok(())
+}
+
+pub async fn save_exchange_cluster(
+    clickhouse: Arc<Client>,
+    row: ExchangeClusterRow,
+)
+    -> anyhow::Result<()>
+{
+    let mut insert = clickhouse
+        .insert::<ExchangeClusterRow>(
+            "exchange_clusters"
         )
         .await?;
 

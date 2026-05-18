@@ -29,9 +29,14 @@ pub fn build_relationships(
     let mut rows = Vec::new();
 
     //
-    // raw TRC20 edges
+    // raw value-transfer edges
     //
     for transfer in transfers {
+        let transfer_type = if transfer.token == "TRX" {
+            RelationshipType::NativeTransfer
+        } else {
+            RelationshipType::Trc20Transfer
+        };
 
         rows.push(
             AddressRelationshipRow {
@@ -56,8 +61,7 @@ pub fn build_relationships(
                 transfer.amount.to_string(),
 
                 transfer_type:
-                RelationshipType::Trc20Transfer
-                    .to_string(),
+                transfer_type.to_string(),
 
                 protocol:
                 protocol.to_string(),

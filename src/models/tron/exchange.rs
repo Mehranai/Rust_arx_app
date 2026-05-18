@@ -4,12 +4,34 @@ use serde::Serialize;
 #[derive(Debug, Clone, Row, Serialize)]
 pub struct ExchangeAddressRow {
     pub address: String,
+    pub entity_id: String,
     pub exchange_name: String,
     pub address_role: String,
     pub confidence: f32,
     pub detection_source: String,
     pub first_seen_block: u64,
     pub last_seen_block: u64,
+}
+
+#[derive(Debug, Clone, Row, Serialize)]
+pub struct ExchangeDepositAddressRow {
+    pub address: String,
+    pub exchange_name: String,
+    pub hot_wallet: String,
+    pub confidence: f32,
+    pub detection_method: String,
+    pub first_seen_block: u64,
+    pub last_seen_block: u64,
+}
+
+#[derive(Debug, Clone, Row, Serialize)]
+pub struct ExchangeClusterRow {
+    pub cluster_id: String,
+    pub exchange_name: String,
+    pub address: String,
+    pub role: String,
+    pub confidence: f32,
+    pub discovered_from: String,
 }
 
 #[derive(Debug, Clone, Row, Serialize)]

@@ -51,7 +51,7 @@ pub async fn propagate_exposure(
             to_address,
             tx_hash,
             block_number
-        FROM tron_aml.address_relationships
+        FROM address_relationships
         WHERE from_address = ?
         LIMIT 1000
         "#;

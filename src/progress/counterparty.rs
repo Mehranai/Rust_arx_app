@@ -14,7 +14,7 @@ pub async fn save_counterparties(
     let mut insert=
         clickhouse
             .insert::<CounterpartyRow>(
-                "tron_aml.address_counterparties"
+                "address_counterparties"
             )
             .await?;
 

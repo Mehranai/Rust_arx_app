@@ -15,6 +15,8 @@ use serde::{
 pub struct CounterpartyRow {
     pub address:String,
     pub counterparty:String,
+    pub direction:String,
+    pub token_address:String,
     pub total_txs:u64,
     pub total_volume:String,
     pub first_seen:u64,

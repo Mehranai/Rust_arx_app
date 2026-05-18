@@ -1,5 +1,3 @@
-use std::env;
-
 #[derive(Debug, Clone)]
 pub enum AppMode {
     Eth,

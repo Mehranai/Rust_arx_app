@@ -45,12 +45,17 @@ use crate::progress::progress_tron::save_relationships;
 use crate::services::tron::aml::mint_burn_detector::detect_mints_and_burns;
 
 // flow detection
-use crate::services::tron::exchange::detector::detect_exchange;
+use crate::services::tron::exchange::detector::{
+    detect_exchange,
+    detect_exchange_attributions,
+};
 use crate::services::tron::exchange::flow_builder::build_exchange_flows;
 use crate::models::tron::exchange::ExchangeAddressRow;
 
 use crate::progress::progress_tron::{
     save_exchange_address,
+    save_exchange_cluster,
+    save_exchange_deposit_address,
     save_exchange_flow,
 };
 
@@ -62,6 +67,9 @@ use crate::models::tron::address_profile::AddressProfileRow;
 use crate::progress::address_profile::{
     save_address_profiles,
 };
+use crate::models::tron::counterparty::CounterpartyRow;
+use crate::progress::counterparty::save_counterparties;
+use crate::services::tron::counterparty::build_counterparty_relations;
 
 const ZERO_ADDRESS: &str =
     "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb";
@@ -301,9 +309,6 @@ async fn process_tx(
 
     let transfers =
         extract_trc20_transfers(&receipt);
-
-    let mut simple_transfers =
-        Vec::<SimpleTransfer>::new();
 
     let mut discovered_tokens =
         HashSet::<String>::new();
@@ -575,6 +580,32 @@ async fn process_tx(
             profile_rows,
         ).await?;
 
+        let counterparty_rows =
+            build_counterparty_relations(
+                &simple_transfers,
+                block_number,
+            )
+                .into_iter()
+                .map(|relation| {
+                    CounterpartyRow {
+                        address: relation.address,
+                        counterparty: relation.counterparty,
+                        direction: relation.direction,
+                        token_address: relation.token_address,
+                        total_txs: relation.total_txs,
+                        total_volume: relation.total_volume.to_string(),
+                        first_seen: relation.first_seen,
+                        last_seen: relation.last_seen,
+                    }
+                })
+                .collect::<Vec<_>>();
+
+        save_counterparties(
+            loader.clickhouse.clone(),
+            counterparty_rows,
+        )
+            .await?;
+
         let exchange_flows =
             build_exchange_flows(
                 &txid,
@@ -587,6 +618,36 @@ async fn process_tx(
                 loader.clickhouse.clone(),
                 flow,
             ).await?;
+        }
+
+        let exchange_detections =
+            detect_exchange_attributions(
+                loader.clickhouse.clone(),
+                block_number,
+                &simple_transfers,
+            )
+                .await?;
+
+        for detection in exchange_detections {
+            save_exchange_address(
+                loader.clickhouse.clone(),
+                detection.address,
+            )
+                .await?;
+
+            if let Some(deposit) = detection.deposit {
+                save_exchange_deposit_address(
+                    loader.clickhouse.clone(),
+                    deposit,
+                )
+                    .await?;
+            }
+
+            save_exchange_cluster(
+                loader.clickhouse.clone(),
+                detection.cluster,
+            )
+                .await?;
         }
     }
 
@@ -617,11 +678,14 @@ async fn process_tx(
                     address:
                     addr.clone(),
 
+                    entity_id:
+                    format!("exchange:{}", exchange.exchange_name.to_lowercase()),
+
                     exchange_name:
                     exchange.exchange_name,
 
                     address_role:
-                    exchange.address_role,
+                    exchange.role,
 
                     confidence:
                     exchange.confidence,

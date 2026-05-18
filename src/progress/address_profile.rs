@@ -14,7 +14,7 @@ pub async fn save_address_profiles(
     let mut insert=
         clickhouse
             .insert::<AddressProfileRow>(
-                "tron_aml.address_profiles"
+                "address_profiles"
             )
             .await?;
 

@@ -3,13 +3,16 @@ use serde::Serialize;
 
 #[derive(Debug, clickhouse::Row, serde::Serialize)]
 pub struct TransactionRow {
+    #[serde(rename = "tx_hash")]
     pub hash: String,
     pub block_number: u64,
+    #[serde(rename = "from_address")]
     pub from_addr: String,
+    #[serde(rename = "to_address")]
     pub to_addr: String,
+    #[serde(rename = "amount")]
     pub value: String,
     pub contract_type: String,
-    pub sensivity: u8,
 }
 
 // models/tron_token_transfer.rs
@@ -19,7 +22,9 @@ pub struct TronTokenTransferRow {
     pub block_number: u64,
     pub log_index: u32,
     pub token_address: String,
+    #[serde(rename = "from_address")]
     pub from_addr: String,
+    #[serde(rename = "to_address")]
     pub to_addr: String,
     pub amount: String,
     pub event_signature: String,

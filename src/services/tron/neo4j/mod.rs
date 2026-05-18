@@ -4,3 +4,5 @@ pub mod nodes;
 pub mod edges;
 pub mod queries;
 pub mod traversal;
+pub mod types;
+pub mod flow_graph;
