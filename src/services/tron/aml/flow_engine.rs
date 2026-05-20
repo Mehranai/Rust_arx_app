@@ -47,7 +47,6 @@ pub fn flatten_flows(
     let mut out = Vec::new();
 
     for (address, token_map) in flow_map {
-
         for (token, delta) in token_map {
 
             out.push(NetFlow {

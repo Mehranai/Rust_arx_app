@@ -13,6 +13,9 @@ use crate::services::tron::batcher::relationships::RelationshipBatcher;
 
 // concurency
 use crate::config::AppConfig;
+use crate::services::tron::batcher::transaction_features::TransactionFeatureBatcher;
+use crate::services::tron::batcher::transaction_risk::TransactionRiskBatcher;
+use std::time::Duration;
 
 pub struct LoaderEth {
     pub clickhouse: Arc<Client>,
@@ -113,7 +116,10 @@ pub struct LoaderTron {
     pub transaction_batcher: Arc<TransactionBatcher>,
     pub token_transfer_batcher: Arc<TokenTransferBatcher>,
     pub relationship_batcher: Arc<RelationshipBatcher>,
+    // batcher
     pub config: Arc<AppConfig>,
+    pub transaction_feature_batcher: Arc<TransactionFeatureBatcher>,
+    pub transaction_risk_batcher: Arc<TransactionRiskBatcher>,
 }
 
 impl LoaderTron {
@@ -145,20 +151,41 @@ impl LoaderTron {
             Semaphore::new(config.rpc_max_concurrency)
         );
 
+        // batcher
         let transaction_batcher =
-            TransactionBatcher::new(
-                clickhouse.clone()
+            TransactionBatcher::create(
+                clickhouse.clone(),
+                50_000,
+                Duration::from_secs(1),
             );
 
         let token_transfer_batcher =
-            TokenTransferBatcher::new(
-                clickhouse.clone()
-        );
+            TokenTransferBatcher::create(
+                clickhouse.clone(),
+                50_000,
+                Duration::from_secs(1),
+            );
 
         let relationship_batcher =
-            RelationshipBatcher::new(
-                clickhouse.clone()
-        );
+            RelationshipBatcher::create(
+                clickhouse.clone(),
+                50_000,
+                Duration::from_secs(1),
+            );
+
+        let transaction_feature_batcher =
+            TransactionFeatureBatcher::create(
+                clickhouse.clone(),
+                10_000,
+                Duration::from_secs(1),
+            );
+
+        let transaction_risk_batcher =
+            TransactionRiskBatcher::create(
+                clickhouse.clone(),
+                10_000,
+                Duration::from_secs(1),
+            );
 
         Ok(Self {
             clickhouse,
@@ -168,6 +195,8 @@ impl LoaderTron {
             token_transfer_batcher,
             relationship_batcher,
             config: Arc::new(config.clone()),
+            transaction_feature_batcher,
+            transaction_risk_batcher,
         })
     }
 }

@@ -9,17 +9,16 @@ use crate::models::tron::modules::TronTokenTransferRow;
 use crate::models::tron::modules::TransactionRiskRow;
 use crate::models::tron::modules::TransactionRow;
 
-
 use crate::progress::progress::{
     save_sync_state,
     save_wallet,
 };
 
 use crate::progress::progress_tron::{
-    save_contract_metadata,
-    save_transaction_features,
-    save_transaction_risk,
     ContractMetadataRow,
+};
+
+use crate::models::tron::modules::{
     TransactionFeatureRow,
 };
 
@@ -41,7 +40,6 @@ use crate::services::tron::tron_metadata_worker;
 use crate::services::tron::risk_engine::compute_risk_score;
 
 use crate::services::tron::relationship_builder::build_relationships;
-use crate::progress::progress_tron::save_relationships;
 use crate::services::tron::aml::mint_burn_detector::detect_mints_and_burns;
 
 // flow detection
@@ -51,13 +49,6 @@ use crate::services::tron::exchange::detector::{
 };
 use crate::services::tron::exchange::flow_builder::build_exchange_flows;
 use crate::models::tron::exchange::ExchangeAddressRow;
-
-use crate::progress::progress_tron::{
-    save_exchange_address,
-    save_exchange_cluster,
-    save_exchange_deposit_address,
-    save_exchange_flow,
-};
 
 // intelligence system
 use crate::services::tron::address_intelligence::{
@@ -274,30 +265,15 @@ async fn process_tx(
         simple_transfers.push(
             SimpleTransfer {
 
-                token:
-                "TRX".to_string(),
+                token: "TRX".to_string(),
 
                 from: from.clone(),
-
                 to: to.clone(),
 
                 amount: value as u128,
             }
         );
     }
-
-    loader.transaction_batcher
-        .push(
-            TransactionRow {
-                hash: txid.clone(),
-                block_number,
-                from_addr: from.clone(),
-                to_addr: to.clone(),
-                value: value as u128,
-                contract_type: contract_type.clone(),
-            }
-        )
-        .await?;
 
     let receipt = {
         let _permit =
@@ -308,6 +284,81 @@ async fn process_tx(
             .get_tx_receipt(&txid)
             .await?
     };
+
+    let timestamp = tx["raw_data"]["timestamp"]
+        .as_u64()
+        .unwrap_or(0);
+
+    let receipt_result = receipt["receipt"]["result"]
+        .as_str()
+        .unwrap_or("");
+
+    let status = if receipt_result == "SUCCESS" {
+        1
+    } else {
+        0
+    };
+
+    let fee = receipt["fee"]
+        .as_u64()
+        .unwrap_or(0) as u128;
+
+    let energy_fee = receipt["energy_fee"]
+        .as_u64()
+        .unwrap_or(0) as u128;
+
+    let net_fee = receipt["net_fee"]
+        .as_u64()
+        .unwrap_or(0) as u128;
+
+    let energy_usage = receipt["receipt"]["energy_usage"]
+        .as_u64()
+        .unwrap_or(0);
+
+    let energy_usage_total =
+        receipt["receipt"]["energy_usage_total"]
+            .as_u64()
+            .unwrap_or(0);
+
+    let net_usage = receipt["receipt"]["net_usage"]
+        .as_u64()
+        .unwrap_or(0);
+
+    // contract classifier
+    let contract_address = tx["raw_data"]["contract"][0]
+        ["parameter"]["value"]["contract_address"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+
+    loader.transaction_batcher
+        .push(
+            TransactionRow {
+                tx_hash: txid.clone(),
+                block_number,
+                timestamp,
+
+                from_address: from.clone(),
+                to_address: to.clone(),
+
+                contract_address: contract_address.clone(),
+
+                contract_type: contract_type.clone(),
+
+                amount: value as u128,
+                fee,
+                energy_fee,
+                net_fee,
+                energy_usage,
+                energy_usage_total,
+                net_usage,
+                status,
+                memo: String::new(),
+
+                raw_data: tx.to_string(),
+            }
+        )
+        .await?;
 
     let transfers =
         extract_trc20_transfers(&receipt);
@@ -321,19 +372,37 @@ async fn process_tx(
         from_addr,
         to_addr,
         amount,
-    ) in transfers
-    {
+    ) in transfers {
         loader
             .token_transfer_batcher
             .push(
                 TronTokenTransferRow {
                     tx_hash: txid.clone(),
                     block_number,
+                    timestamp,
+
                     log_index,
+
                     token_address: token.clone(),
-                    from_addr: from_addr.clone(),
-                    to_addr: to_addr.clone(),
+
+                    token_symbol: String::new(),
+
+                    decimals: 0,
+
+                    from_address: from_addr.clone(),
+
+                    to_address: to_addr.clone(),
+
                     amount,
+
+                    amount_decimal: 0.0,
+
+                    is_mint:
+                    (from_addr == ZERO_ADDRESS) as u8,
+
+                    is_burn:
+                    (to_addr == ZERO_ADDRESS) as u8,
+
                     event_signature:
                     ERC20_TRANSFER_TOPIC.to_string(),
                 }
@@ -370,13 +439,6 @@ async fn process_tx(
         )
             .await?;
     }
-
-    // contract classifier
-    let contract_address = tx["raw_data"]["contract"][0]
-        ["parameter"]["value"]["contract_address"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
 
     let method_data = tx["raw_data"]["contract"][0]
         ["parameter"]["value"]["data"]
@@ -423,10 +485,9 @@ async fn process_tx(
             created_at_block: block_number,
         };
 
-        save_contract_metadata(
-            loader.clickhouse.clone(),
-            row,
-        )
+        loader
+            .contract_metadata_batcher
+            .push(row)
             .await?;
     }
 
@@ -468,8 +529,12 @@ async fn process_tx(
 
         let feature =
             TransactionFeatureRow {
+
                 tx_hash: txid.clone(),
+
                 block_number,
+
+                timestamp,
 
                 is_swap:
                 (!swaps.is_empty()) as u8,
@@ -477,9 +542,29 @@ async fn process_tx(
                 is_bridge:
                 (!bridges.is_empty()) as u8,
 
+                is_mint:
+                (!mint_burns.is_empty()) as u8,
+
+                is_burn:
+                (!mint_burns.is_empty()) as u8,
+
+                is_liquidity_add: 0,
+
+                is_liquidity_remove: 0,
+
                 is_contract_call,
 
                 unique_tokens,
+
+                participants,
+
+                hop_count:
+                simple_transfers.len() as u16,
+
+                fan_in:
+                participants,
+
+                fan_out:
                 participants,
             };
 
@@ -489,10 +574,9 @@ async fn process_tx(
         aml_events.extend(bridges.clone());
         aml_events.extend(mint_burns.clone());
 
-        save_transaction_features(
-            loader.clickhouse.clone(),
-            feature,
-        )
+        loader
+            .transaction_feature_batcher
+            .push(feature)
             .await?;
 
         // risk engine
@@ -509,28 +593,30 @@ async fn process_tx(
 
         let risk_row =
             TransactionRiskRow {
+
                 tx_hash: txid.clone(),
                 block_number,
+                timestamp,
 
                 risk_score,
                 risk_level,
 
-                is_swap:
-                (!swaps.is_empty()) as u8,
-
-                is_bridge:
-                (!bridges.is_empty()) as u8,
-
+                is_swap: (!swaps.is_empty()) as u8,
+                is_bridge: (!bridges.is_empty()) as u8,
                 is_contract_call,
 
                 unique_tokens,
                 participants,
-            };
 
-        save_transaction_risk(
-            loader.clickhouse.clone(),
-            risk_row,
-        )
+                risk_reasons: vec![],
+                exposure_depth: 0,
+                touches_sanctioned: 0,
+                touches_mixer: 0,
+                touches_exchange: 0,
+            };
+        loader
+            .transaction_risk_batcher
+            .push(risk_row)
             .await?;
 
         let relationships =
@@ -620,10 +706,10 @@ async fn process_tx(
             );
 
         for flow in exchange_flows {
-            save_exchange_flow(
-                loader.clickhouse.clone(),
-                flow,
-            ).await?;
+            loader
+                .exchange_flow_batcher
+                .push(flow)
+                .await?;
         }
 
         let exchange_detections =
